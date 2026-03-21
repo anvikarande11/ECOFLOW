@@ -101,12 +101,9 @@ def reset_stats():
     stats = {"dry": 0, "wet": 0} 
     return jsonify({"status": "success", "stats": stats})
 
-if __name__ == '__main__':
-    # threaded=True allows the UI to update while the camera runs
-    app.run(host='0.0.0.0', port=5000, threaded=True, debug=False)
-
-@app.route('/reset_stats')
-def reset_stats():
-    global stats
-    stats = {"dry": 0, "wet": 0}
-    return jsonify({"status": "success", "stats": stats})
+if __name__ == "__main__":
+    import os
+    # Render provides a dynamic PORT, so we must grab it from the environment
+    port = int(os.environ.get("PORT", 5000))
+    # threaded=True is great for handling the camera and UI simultaneously
+    app.run(host='0.0.0.0', port=port, threaded=True, debug=False)
