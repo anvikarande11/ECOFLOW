@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>EcoFlow | Autonomous Waste Intelligence</title>
-  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Space+Grotesk:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
   <style>
     :root {
@@ -155,7 +154,7 @@
     </div>
 
     <div class="viewport">
-      <img id="videoFeed" class="hidden">
+      <video id="videoFeed" class="hidden" autoplay playsinline></video>
       <div id="placeholder">SYSTEM OFFLINE<br>> AWAITING FOR INPUT</div>
     </div>
 
@@ -191,7 +190,7 @@
   </div>
 
   <script>
-    let currentDry = 0, currentWet = 0, lastTotal = 0, cameraActive = false;
+    let currentDry = 0, currentWet = 0, lastTotal = 0, cameraActive = false, localStream = null;
 
     // 1. VOICE FUNCTION
     function mobileSpeak(text) {
@@ -214,31 +213,105 @@
             mobileSpeak("System reset. All counters returned to zero.");
         } catch(e) { mobileSpeak("Error. Reset failed."); }
     }
+// 3. EXPORT (ENHANCED STABILITY)
+    function exportData() {
+        try {
+            const timestamp = new Date().toLocaleString();
+            const total = currentDry + currentWet;
+            
+            // Generate the file content
+            const content = `=========================================
+ECOFLOW: AUTONOMOUS WASTE REPORT
+=========================================
+GENERATED: ${timestamp}
+-----------------------------------------
+DRY OBJECTS DETECTED: ${currentDry}
+WET OBJECTS DETECTED: ${currentWet}
+TOTAL LOGGED:         ${total}
+-----------------------------------------
+MISSION STATUS: COMPLETED
+=========================================`;
 
-    // 3. CAMERA TOGGLE (UPDATED LOGIC)
-    function toggleCamera() {
-      const feed = document.getElementById('videoFeed');
-      const btn = document.getElementById('camera-btn');
-      const placeholder = document.getElementById('placeholder');
-      
-      if (!cameraActive) {
-        mobileSpeak("System online"); // Speak when turning ON
-        feed.src = "/video_feed?t=" + new Date().getTime();
-        feed.classList.remove('hidden');
-        placeholder.classList.add('hidden');
-        btn.className = 'btn btn-danger'; 
-        btn.innerText = 'TERMINATE LINK';
-        cameraActive = true;
-      } else {
-        mobileSpeak("System offline"); // Speak when turning OFF
-        feed.src = ""; 
-        feed.classList.add('hidden');
-        placeholder.classList.remove('hidden');
-        btn.className = 'btn btn-primary'; 
-        btn.innerText = 'INITIALIZE CAMERA';
-        cameraActive = false;
-      }
+            // Create the blob and a temporary URL
+            const blob = new Blob([content], { type: 'text/plain' });
+            const reportUrl = window.URL.createObjectURL(blob);
+            
+            // Create a hidden link and trigger it
+            const downloadLink = document.createElement('a');
+            downloadLink.href = reportUrl;
+            downloadLink.download = `EcoFlow_Export_${new Date().getTime()}.txt`;
+            
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            
+            // Clean up
+            document.body.removeChild(downloadLink);
+            window.URL.revokeObjectURL(reportUrl);
+            
+            mobileSpeak("Report generated and downloaded.");
+        } catch (error) {
+            console.error("Export failed:", error);
+            mobileSpeak("Error. Export failed.");
+        }
     }
+    // 3. CAMERA TOGGLE (UPDATED LOGIC)
+   async function toggleCamera() {
+    const feed = document.getElementById('videoFeed');
+    const btn = document.getElementById('camera-btn');
+    
+    if (!cameraActive) {
+        // If we are on the LIVE website, use the Browser Camera API
+        if (window.location.hostname !== "127.0.0.1" && window.location.hostname !== "localhost") {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                feed.srcObject = stream; // Use srcObject for live video
+                feed.play();
+            } catch (err) {
+                alert("Cloud access requires HTTPS and camera permission.");
+            }
+        } else {
+            // If we are LOCAL, use the Flask stream
+            feed.src = "{{ url_for('video_feed') }}";
+        }
+        
+        feed.classList.remove('hidden');
+        cameraActive = true;
+        btn.innerText = "TERMINATE LINK";
+    } else {
+        location.reload(); // Quickest way to kill all streams safely
+    }
+} 
+
+async function processFrames() {
+    if (!cameraActive) return;
+
+    const video = document.getElementById('videoFeed');
+    const canvas = document.createElement('canvas');
+    canvas.width = 224;
+    canvas.height = 224;
+    const ctx = canvas.getContext('2d');
+
+    // Draw the current video frame to a hidden canvas
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL('image/jpeg');
+
+    // Send this image to a new Flask route called /process_frame
+    try {
+        const response = await fetch('/process_frame', {
+            method: 'POST',
+            body: JSON.stringify({ image: dataUrl }),
+            headers: { 'Content-Type': 'application/json' }
+        });
+        const result = await response.json();
+        
+        // Update your UI stats here based on result
+    } catch (e) {
+        console.error("AI Processing error", e);
+    }
+
+    // Repeat every 500ms (Adjust for efficiency)
+    setTimeout(processFrames, 500);
+}
 
     // 4. UI UPDATER
     function updateUI(data) {
@@ -304,47 +377,7 @@
         .map(t => `<div class="tip-item"><span style="font-size:24px;">${t.icon}</span><div><p style="font-weight:bold; font-size:0.9rem;">${t.name}</p><p style="font-size:0.8rem; color:var(--text-muted);">${t.tip}</p></div></div>`)
         .join("");
     }
-// 3. EXPORT (ENHANCED STABILITY)
-    function exportData() {
-        try {
-            const timestamp = new Date().toLocaleString();
-            const total = currentDry + currentWet;
-            
-            // Generate the file content
-            const content = `=========================================
-ECOFLOW: AUTONOMOUS WASTE REPORT
-=========================================
-GENERATED: ${timestamp}
------------------------------------------
-DRY OBJECTS DETECTED: ${currentDry}
-WET OBJECTS DETECTED: ${currentWet}
-TOTAL LOGGED:         ${total}
------------------------------------------
-MISSION STATUS: COMPLETED
-=========================================`;
 
-            // Create the blob and a temporary URL
-            const blob = new Blob([content], { type: 'text/plain' });
-            const reportUrl = window.URL.createObjectURL(blob);
-            
-            // Create a hidden link and trigger it
-            const downloadLink = document.createElement('a');
-            downloadLink.href = reportUrl;
-            downloadLink.download = `EcoFlow_Export_${new Date().getTime()}.txt`;
-            
-            document.body.appendChild(downloadLink);
-            downloadLink.click();
-            
-            // Clean up
-            document.body.removeChild(downloadLink);
-            window.URL.revokeObjectURL(reportUrl);
-            
-            mobileSpeak("Report generated and downloaded.");
-        } catch (error) {
-            console.error("Export failed:", error);
-            mobileSpeak("Error. Export failed.");
-        }
-    }
     document.getElementById('db-search').addEventListener('input', (e) => { renderTips("", e.target.value); });
     function toggleGuide() { document.getElementById("guide-panel").classList.toggle("open"); renderTips("dry"); }
     function switchTab(tab) {
@@ -374,28 +407,6 @@ MISSION STATUS: COMPLETED
         stars.appendChild(s);
       }
     });
-    // 1. The "Voice" Fix (Replaces pyttsx3)
-    function speakResult(text) {
-        const utterance = new SpeechSynthesisUtterance(text);
-        window.speechSynthesis.speak(utterance);
-    }
-
-    // 2. The "Camera" Fix (Replaces cv2.VideoCapture)
-    const video = document.getElementById('webcam'); // Ensure your <video> tag has id="webcam"
-    
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-        navigator.mediaDevices.getUserMedia({ video: true })
-            .then(function (stream) {
-                video.srcObject = stream;
-                video.play();
-            })
-            .catch(function (error) {
-                console.log("Camera blocked or not found: ", error);
-            });
-    }
-
-    // Example: Trigger the voice when a classification happens
-    // You can call speakResult("Wet Waste Detected") from your classification logic
   </script>
 </body>
 </html>
