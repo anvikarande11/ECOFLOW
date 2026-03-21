@@ -1,3 +1,5 @@
+.venv/
+venv/
 /dry_waste
 /EcoFlow_Data
 /train_ecoflow.py
