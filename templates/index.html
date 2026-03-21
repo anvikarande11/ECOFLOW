@@ -374,6 +374,28 @@ MISSION STATUS: COMPLETED
         stars.appendChild(s);
       }
     });
+    // 1. The "Voice" Fix (Replaces pyttsx3)
+    function speakResult(text) {
+        const utterance = new SpeechSynthesisUtterance(text);
+        window.speechSynthesis.speak(utterance);
+    }
+
+    // 2. The "Camera" Fix (Replaces cv2.VideoCapture)
+    const video = document.getElementById('webcam'); // Ensure your <video> tag has id="webcam"
+    
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(function (stream) {
+                video.srcObject = stream;
+                video.play();
+            })
+            .catch(function (error) {
+                console.log("Camera blocked or not found: ", error);
+            });
+    }
+
+    // Example: Trigger the voice when a classification happens
+    // You can call speakResult("Wet Waste Detected") from your classification logic
   </script>
 </body>
 </html>
