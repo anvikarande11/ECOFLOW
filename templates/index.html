@@ -309,9 +309,10 @@
         }
 
         setTimeout(sendFramesToAI, 1000); // Scan every 1 second
+        sendFramesToAI();
     }
 
-    // --- 3. SYSTEM CONTROLS ---
+    // --- 3. SYSTEM CONTROLS ---=
 
     async function resetSystem() {
         try {
