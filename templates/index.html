@@ -154,7 +154,7 @@
     </div>
 
     <div class="viewport">
-      <img id="videoFeed" class="hidden">
+      <video id="videoFeed" class="hidden" autoplay playsinline muted></video>
       <div id="placeholder">SYSTEM OFFLINE<br>> AWAITING FOR INPUT</div>
     </div>
 
@@ -277,6 +277,13 @@ MISSION STATUS: COMPLETED
         btn.innerText = 'INITIALIZE CAMERA';
         cameraActive = false;
       }
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+    video: { 
+        facingMode: "environment", // This forces the BACK camera
+        width: { ideal: 640 },
+        height: { ideal: 480 }
+    } 
+});
     }
 
     // 4. UI UPDATER
