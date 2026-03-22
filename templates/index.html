@@ -154,7 +154,7 @@
     </div>
 
     <div class="viewport">
-      <video id="videoFeed" class="hidden" autoplay playsinline></video>
+      <img id="videoFeed" class="hidden">
       <div id="placeholder">SYSTEM OFFLINE<br>> AWAITING FOR INPUT</div>
     </div>
 
@@ -190,7 +190,7 @@
   </div>
 
   <script>
-    let currentDry = 0, currentWet = 0, lastTotal = 0, cameraActive = false, localStream = null;
+    let currentDry = 0, currentWet = 0, lastTotal = 0, cameraActive = false;
 
     // 1. VOICE FUNCTION
     function mobileSpeak(text) {
@@ -255,63 +255,29 @@ MISSION STATUS: COMPLETED
         }
     }
     // 3. CAMERA TOGGLE (UPDATED LOGIC)
-   async function toggleCamera() {
-    const feed = document.getElementById('videoFeed');
-    const btn = document.getElementById('camera-btn');
-    
-    if (!cameraActive) {
-        // If we are on the LIVE website, use the Browser Camera API
-        if (window.location.hostname !== "127.0.0.1" && window.location.hostname !== "localhost") {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                feed.srcObject = stream; // Use srcObject for live video
-                feed.play();
-            } catch (err) {
-                alert("Cloud access requires HTTPS and camera permission.");
-            }
-        } else {
-            // If we are LOCAL, use the Flask stream
-            feed.src = "{{ url_for('video_feed') }}";
-        }
-        
+    function toggleCamera() {
+      const feed = document.getElementById('videoFeed');
+      const btn = document.getElementById('camera-btn');
+      const placeholder = document.getElementById('placeholder');
+      
+      if (!cameraActive) {
+        mobileSpeak("System online"); // Speak when turning ON
+        feed.src = "/video_feed?t=" + new Date().getTime();
         feed.classList.remove('hidden');
+        placeholder.classList.add('hidden');
+        btn.className = 'btn btn-danger'; 
+        btn.innerText = 'TERMINATE LINK';
         cameraActive = true;
-        btn.innerText = "TERMINATE LINK";
-    } else {
-        location.reload(); // Quickest way to kill all streams safely
+      } else {
+        mobileSpeak("System offline"); // Speak when turning OFF
+        feed.src = ""; 
+        feed.classList.add('hidden');
+        placeholder.classList.remove('hidden');
+        btn.className = 'btn btn-primary'; 
+        btn.innerText = 'INITIALIZE CAMERA';
+        cameraActive = false;
+      }
     }
-} 
-
-async function processFrames() {
-    if (!cameraActive) return;
-
-    const video = document.getElementById('videoFeed');
-    const canvas = document.createElement('canvas');
-    canvas.width = 224;
-    canvas.height = 224;
-    const ctx = canvas.getContext('2d');
-
-    // Draw the current video frame to a hidden canvas
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const dataUrl = canvas.toDataURL('image/jpeg');
-
-    // Send this image to a new Flask route called /process_frame
-    try {
-        const response = await fetch('/process_frame', {
-            method: 'POST',
-            body: JSON.stringify({ image: dataUrl }),
-            headers: { 'Content-Type': 'application/json' }
-        });
-        const result = await response.json();
-        
-        // Update your UI stats here based on result
-    } catch (e) {
-        console.error("AI Processing error", e);
-    }
-
-    // Repeat every 500ms (Adjust for efficiency)
-    setTimeout(processFrames, 500);
-}
 
     // 4. UI UPDATER
     function updateUI(data) {
