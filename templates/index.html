@@ -189,197 +189,221 @@
     </div>
   </div>
 
-  <script>
+ <script>
+    // --- GLOBAL STATE ---
     let currentDry = 0, currentWet = 0, lastTotal = 0, cameraActive = false;
 
-    // 1. VOICE FUNCTION
+    // --- 1. UTILITY FUNCTIONS ---
+
+    // Logging for the Debug Console
+    function log(msg) {
+        const consoleEl = document.getElementById('debug-console');
+        if (consoleEl) {
+            const time = new Date().toLocaleTimeString().split(' ')[0];
+            consoleEl.innerHTML += `<div>[${time}] ${msg}</div>`;
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+    }
+
+    // Voice Synthesis
     function mobileSpeak(text) {
         if ('speechSynthesis' in window && text !== "") {
             window.speechSynthesis.cancel(); 
             const utterance = new SpeechSynthesisUtterance(text);
-            utterance.pitch = 0.8; 
+            utterance.pitch = 1.0; 
             utterance.rate = 1;
             window.speechSynthesis.speak(utterance);
         }
     }
 
-    // 2. RESET SYSTEM
+    // UI Updates
+    function updateUI(stats) {
+        document.getElementById('dry-count').innerText = stats.dry;
+        document.getElementById('wet-count').innerText = stats.wet;
+        
+        const total = stats.dry + stats.wet;
+        const totalLabel = document.getElementById('total-label');
+        if(totalLabel) totalLabel.innerText = total + ' OBJECTS LOGGED';
+
+        if (stats.dry > currentDry || stats.wet > currentWet) {
+            if ('vibrate' in navigator) navigator.vibrate(100);
+            currentDry = stats.dry;
+            currentWet = stats.wet;
+        }
+    }
+
+    // --- 2. CORE CAMERA & AI LOGIC ---
+
+    async function toggleCamera() {
+        const video = document.getElementById('videoFeed');
+        const btn = document.getElementById('camera-btn');
+        const badge = document.getElementById('ai-badge');
+        const placeholder = document.getElementById('placeholder');
+
+        if (!cameraActive) {
+            log("Initializing AI Scanner...");
+            const constraints = {
+                video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } },
+                audio: false
+            };
+
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+                
+                video.onloadedmetadata = () => {
+                    video.play().then(() => {
+                        log("Stream Active: System Online.");
+                    });
+                };
+
+                video.classList.remove('hidden');
+                placeholder.classList.add('hidden');
+                document.getElementById('scanner').style.display = 'block';
+                badge.classList.remove('hidden');
+                
+                cameraActive = true;
+                btn.innerText = "TERMINATE LINK";
+                btn.className = "btn btn-danger";
+                
+                // Start the AI processing loop
+                sendFramesToAI(); 
+
+            } catch (err) {
+                log("CAMERA ERROR: " + err.name);
+                alert("Please ensure you are using HTTPS and have allowed camera access.");
+            }
+        } else {
+            location.reload(); 
+        }
+    }
+
+    // This function captures frames and sends them to your Flask app.py
+    async function sendFramesToAI() {
+        if (!cameraActive) return;
+
+        const video = document.getElementById('videoFeed');
+        const canvas = document.createElement('canvas');
+        canvas.width = 224; 
+        canvas.height = 224;
+        const ctx = canvas.getContext('2d');
+        
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.5); 
+
+        try {
+            const response = await fetch('/process_frame', {
+                method: 'POST',
+                body: JSON.stringify({ image: dataUrl }),
+                headers: { 'Content-Type': 'application/json' }
+            });
+            
+            const result = await response.json();
+            
+            if(result.status === "success") {
+                document.getElementById('ai-badge').innerText = `AI CORE: ${result.label} (${result.conf}%)`;
+                updateUI(result.stats);
+            }
+        } catch (err) {
+            console.error("AI Sync Error");
+        }
+
+        setTimeout(sendFramesToAI, 1000); // Scan every 1 second
+    }
+
+    // --- 3. SYSTEM CONTROLS ---
+
     async function resetSystem() {
         try {
             const res = await fetch('/reset_stats');
             const data = await res.json();
             currentDry = 0; currentWet = 0; lastTotal = 0;
             updateUI(data.stats);
-            mobileSpeak("System reset. All counters returned to zero.");
-        } catch(e) { mobileSpeak("Error. Reset failed."); }
+            mobileSpeak("System Reset Successful");
+        } catch (e) {
+            log("Reset failed.");
+        }
     }
-// 3. EXPORT (ENHANCED STABILITY)
+
     function exportData() {
         try {
             const timestamp = new Date().toLocaleString();
             const total = currentDry + currentWet;
-            
-            // Generate the file content
-            const content = `=========================================
-ECOFLOW: AUTONOMOUS WASTE REPORT
-=========================================
-GENERATED: ${timestamp}
------------------------------------------
-DRY OBJECTS DETECTED: ${currentDry}
-WET OBJECTS DETECTED: ${currentWet}
-TOTAL LOGGED:         ${total}
------------------------------------------
-MISSION STATUS: COMPLETED
-=========================================`;
-
-            // Create the blob and a temporary URL
+            const content = `ECOFLOW REPORT\nGenerated: ${timestamp}\nDry: ${currentDry}\nWet: ${currentWet}\nTotal: ${total}`;
             const blob = new Blob([content], { type: 'text/plain' });
-            const reportUrl = window.URL.createObjectURL(blob);
-            
-            // Create a hidden link and trigger it
-            const downloadLink = document.createElement('a');
-            downloadLink.href = reportUrl;
-            downloadLink.download = `EcoFlow_Export_${new Date().getTime()}.txt`;
-            
-            document.body.appendChild(downloadLink);
-            downloadLink.click();
-            
-            // Clean up
-            document.body.removeChild(downloadLink);
-            window.URL.revokeObjectURL(reportUrl);
-            
-            mobileSpeak("Report generated and downloaded.");
-        } catch (error) {
-            console.error("Export failed:", error);
-            mobileSpeak("Error. Export failed.");
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `EcoFlow_Report.txt`;
+            a.click();
+            mobileSpeak("Report downloaded.");
+        } catch (e) {
+            log("Export Error");
         }
     }
-    // 3. CAMERA TOGGLE (UPDATED LOGIC)
-    function toggleCamera() {
-      const feed = document.getElementById('videoFeed');
-      const btn = document.getElementById('camera-btn');
-      const placeholder = document.getElementById('placeholder');
-      
-      if (!cameraActive) {
-        mobileSpeak("System online"); // Speak when turning ON
-        feed.src = "/video_feed?t=" + new Date().getTime();
-        feed.classList.remove('hidden');
-        placeholder.classList.add('hidden');
-        btn.className = 'btn btn-danger'; 
-        btn.innerText = 'TERMINATE LINK';
-        cameraActive = true;
-      } else {
-        mobileSpeak("System offline"); // Speak when turning OFF
-        feed.src = ""; 
-        feed.classList.add('hidden');
-        placeholder.classList.remove('hidden');
-        btn.className = 'btn btn-primary'; 
-        btn.innerText = 'INITIALIZE CAMERA';
-        cameraActive = false;
-      }
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-    video: { 
-        facingMode: "environment", // This forces the BACK camera
-        width: { ideal: 640 },
-        height: { ideal: 480 }
-    } 
-});
-    }
 
-    // 4. UI UPDATER
-    function updateUI(data) {
-        document.getElementById('dry-count').innerText = data.dry;
-        document.getElementById('wet-count').innerText = data.wet;
-        const total = data.dry + data.wet;
-        document.getElementById('total-label').innerText = total + ' OBJECTS LOGGED';
-        const dP = total > 0 ? (data.dry / total) * 100 : 0;
-        const wP = total > 0 ? (data.wet / total) * 100 : 0;
-        document.getElementById('total-dry').style.width = dP + '%';
-        document.getElementById('total-wet').style.width = wP + '%';
-    }
+    // --- 4. DATA & UI COMPONENTS ---
 
-    // 5. STATS LOOP
-    setInterval(async () => {
-      if(!cameraActive) return;
-      try {
-        const res = await fetch('/get_stats');
-        const data = await res.json();
-        const total = data.dry + data.wet;
-        if (total > lastTotal) {
-            if (data.dry > currentDry) mobileSpeak("Dry waste detected");
-            else if (data.wet > currentWet) mobileSpeak("Wet waste detected");
-        }
-        currentDry = data.dry; currentWet = data.wet; lastTotal = total;
-        updateUI(data);
-      } catch(e) {}
-    }, 1000);
-
-    // --- EXPANDED DATABASE ---
     const tips = {
-      dry: [
-        { icon: "📦", name: "Cardboard", tip: "Keep dry and flattened." },
-        { icon: "🥤", name: "Plastic Bottles", tip: "Rinse and crush to save space." },
-        { icon: "📄", name: "Office Paper", tip: "Recyclable unless shredded." },
-        { icon: "🥫", name: "Metal Cans", tip: "Aluminum/Steel are 100% recyclable." },
-        { icon: "🧴", name: "Shampoo Bottle", tip: "Empty and rinse before disposal." },
-        { icon: "🗞️", name: "Newspaper", tip: "Bundle together with twine." },
-        { icon: "🍳", name: "Scrap Metal", tip: "Check for local scrap metal centers." },
-        { icon: "📦", name: "Pizza Box", tip: "Recycle only if free of grease." },
-        { icon: "🥛", name: "Glass Jar", tip: "Remove lids; lids are often metal." },
-        { icon: "✉️", name: "Envelopes", tip: "Windowed envelopes are usually okay." }
-      ],
-      wet: [
-        { icon: "🍎", name: "Food Scraps", tip: "Organic matter for compost." },
-        { icon: "☕", name: "Coffee Grounds", tip: "Nitrogen-rich; great for soil." },
-        { icon: "🥚", name: "Eggshells", tip: "Crush to speed up composting." },
-        { icon: "🍌", name: "Fruit Peels", tip: "Excellent green waste for bins." },
-        { icon: "🥬", name: "Leafy Greens", tip: "Decomposes very quickly." },
-        { icon: "🍵", name: "Tea Bags", tip: "Check if bags are biodegradable." },
-        { icon: "🦴", name: "Animal Bones", tip: "Only for industrial composting." },
-        { icon: "🍞", name: "Stale Bread", tip: "Small amounts are fine for compost." },
-        { icon: "🌽", name: "Corn Husks", tip: "High carbon; good 'brown' waste." },
-        { icon: "💐", name: "Dead Flowers", tip: "Remove any plastic wrap first." }
-      ]
+        dry: [
+            { icon: "📦", name: "Cardboard", tip: "Keep dry and flattened." },
+            { icon: "🥤", name: "Plastic Bottles", tip: "Rinse and crush to save space." },
+            { icon: "📄", name: "Office Paper", tip: "Recyclable unless shredded." },
+            { icon: "🥫", name: "Metal Cans", tip: "Aluminum/Steel are 100% recyclable." }
+        ],
+        wet: [
+            { icon: "🍎", name: "Food Scraps", tip: "Organic matter for compost." },
+            { icon: "☕", name: "Coffee Grounds", tip: "Nitrogen-rich; great for soil." },
+            { icon: "🥚", name: "Eggshells", tip: "Crush to speed up composting." },
+            { icon: "🍌", name: "Fruit Peels", tip: "Excellent green waste." }
+        ]
     };
 
     function renderTips(type, filter = "") {
-      const list = document.getElementById("tip-list");
-      const source = filter ? [...tips.dry, ...tips.wet] : tips[type];
-      list.innerHTML = source
-        .filter(t => t.name.toLowerCase().includes(filter.toLowerCase()))
-        .map(t => `<div class="tip-item"><span style="font-size:24px;">${t.icon}</span><div><p style="font-weight:bold; font-size:0.9rem;">${t.name}</p><p style="font-size:0.8rem; color:var(--text-muted);">${t.tip}</p></div></div>`)
-        .join("");
+        const list = document.getElementById("tip-list");
+        if(!list) return;
+        const source = filter ? [...tips.dry, ...tips.wet] : tips[type];
+        list.innerHTML = source
+            .filter(t => t.name.toLowerCase().includes(filter.toLowerCase()))
+            .map(t => `<div class="tip-item"><span style="font-size:24px;">${t.icon}</span><div><p style="font-weight:bold; font-size:0.9rem;">${t.name}</p><p style="font-size:0.8rem; color:gray;">${t.tip}</p></div></div>`)
+            .join("");
     }
 
-    document.getElementById('db-search').addEventListener('input', (e) => { renderTips("", e.target.value); });
-    function toggleGuide() { document.getElementById("guide-panel").classList.toggle("open"); renderTips("dry"); }
-    function switchTab(tab) {
-      document.getElementById("tab-dry").className = tab === "dry" ? "tab active-dry" : "tab";
-      document.getElementById("tab-wet").className = tab === "wet" ? "tab active-wet" : "tab";
-      renderTips(tab);
-    }
-    function toggleTheme() {
-      const isDark = document.body.getAttribute('data-theme') === 'dark';
-      document.body.setAttribute('data-theme', isDark ? 'light' : 'dark');
-      document.getElementById('theme-btn').innerText = isDark ? '🌙' : '☀️';
-    }
+    // --- 5. INITIALIZATION ---
 
     window.addEventListener('load', () => {
-      setTimeout(() => {
-        document.getElementById('intro-overlay').classList.add('fade-out');
-        document.getElementById('main-content').classList.add('visible');
-      }, 2000);
-      const stars = document.getElementById('star-container');
-      for (let i = 0; i < 80; i++) {
-        const s = document.createElement('div');
-        s.className = 'star';
-        s.style.left = Math.random() * 100 + 'vw';
-        s.style.top = Math.random() * 100 + 'vh';
-        s.style.width = s.style.height = Math.random() * 2 + 'px';
-        s.style.setProperty('--duration', (Math.random() * 3 + 2) + 's');
-        stars.appendChild(s);
-      }
+        // Star Background
+        const stars = document.getElementById('star-container');
+        if(stars) {
+            for (let i = 0; i < 50; i++) {
+                const s = document.createElement('div');
+                s.className = 'star';
+                s.style.left = Math.random() * 100 + 'vw';
+                s.style.top = Math.random() * 100 + 'vh';
+                stars.appendChild(s);
+            }
+        }
+        
+        // UI Tabs
+        const searchInput = document.getElementById('db-search');
+        if(searchInput) {
+            searchInput.addEventListener('input', (e) => { renderTips("", e.target.value); });
+        }
+
+        // Overlay transition
+        setTimeout(() => {
+            document.getElementById('intro-overlay').classList.add('fade-out');
+            document.getElementById('main-content').classList.add('visible');
+        }, 2000);
     });
-  </script>
+
+    // Helper functions for UI interaction
+    function toggleGuide() { document.getElementById("guide-panel").classList.toggle("open"); renderTips("dry"); }
+    function switchTab(tab) { renderTips(tab); }
+    function toggleTheme() {
+        const isDark = document.body.getAttribute('data-theme') === 'dark';
+        document.body.setAttribute('data-theme', isDark ? 'light' : 'dark');
+    }
+</script>
 </body>
 </html>
