@@ -1,249 +1,63 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EcoFlow | Autonomous Waste Intelligence</title>
-  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Space+Grotesk:wght@400;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-  <style>
-    :root {
-      --bg-color: #f7f7e9;
-      --card-bg: #ffffff;
-      --text-main: #1a1a1a;
-      --text-muted: #444;
-      --border-color: #eee;
-      --viewport-border: #ddd;
-      --accent-green: #7ceb7c; 
-      --mission-bg: rgba(0, 0, 0, 0.03);
-    }
-
-    [data-theme="dark"] {
-      --bg-color: #0a0b10;
-      --card-bg: #161821;
-      --text-main: #f4f4f9;
-      --text-muted: #aaa;
-      --border-color: #2a2d3a;
-      --viewport-border: #7ceb7c;
-      --accent-green: #7ceb7c;
-      --mission-bg: rgba(255, 255, 255, 0.05);
-    }
-
-    * { margin: 0; padding: 0; box-sizing: border-box; transition: background 0.3s, color 0.3s; }
-    
-    body { 
-      font-family: 'Space Grotesk', sans-serif; 
-      background: var(--bg-color); 
-      color: var(--text-main); 
-      min-height: 100vh; 
-      overflow-x: hidden; 
-    }
-
-    #intro-overlay {
-      position: fixed; inset: 0; background: #0a0b10; z-index: 1000;
-      display: flex; align-items: center; justify-content: center;
-      transition: opacity 1s ease-out, visibility 1s;
-    }
-    .intro-text {
-      font-family: 'Press Start 2P', cursive; font-size: 2.5rem; color: #fff;
-      overflow: hidden; white-space: nowrap; border-right: 4px solid var(--accent-green);
-      width: 0; animation: reveal-text 1.5s steps(10, end) forwards, blink-cursor 0.8s infinite;
-    }
-    .intro-text span { color: var(--accent-green); }
-    @keyframes reveal-text { from { width: 0; } to { width: 100%; max-width: 480px; } }
-    @keyframes blink-cursor { 50% { border-color: transparent; } }
-    .fade-out { opacity: 0; visibility: hidden; pointer-events: none; }
-
-    #star-container { position: fixed; inset: 0; pointer-events: none; display: none; z-index: 0; }
-    [data-theme="dark"] #star-container { display: block; }
-    .star { position: absolute; background: white; border-radius: 50%; opacity: 0.5; animation: twinkle var(--duration) infinite ease-in-out; }
-    @keyframes twinkle { 0%, 100% { opacity: 0.3; transform: scale(1); } 50% { opacity: 1; transform: scale(1.2); } }
-
-    .container { position: relative; z-index: 1; max-width: 800px; margin: 0 auto; padding: 2rem 1rem; display: flex; flex-direction: column; align-items: center; gap: 1.5rem; opacity: 0; transition: opacity 1s ease-in; }
-    .visible { opacity: 1; }
-
-    .theme-toggle { position: absolute; top: 20px; right: 20px; background: var(--card-bg); border: 1px solid var(--border-color); color: var(--text-main); padding: 10px; border-radius: 50%; cursor: pointer; z-index: 100; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-
-    header { text-align: center; margin-bottom: 1rem; width: 100%; }
-    h1 { font-family: 'Press Start 2P', system-ui; font-size: 1.8rem; letter-spacing: 2px; margin-bottom: 2rem; color: var(--text-main); }
-    h1 span { color: var(--accent-green); }
-
-    .mission-box { max-width: 650px; margin: 0 auto; padding: 1rem; background: var(--mission-bg); border-radius: 1rem; }
-    .mission-label { color: var(--accent-green); font-family: 'Press Start 2P', system-ui; font-size: 0.55rem; display: block; margin-bottom: 10px; }
-    .mission-text { font-size: 0.95rem; line-height: 1.6; color: var(--text-muted); text-align: center; }
-
-    .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; width: 100%; max-width: 520px; }
-    .stat-card { background: var(--card-bg); border-radius: 1rem; padding: 1.2rem; text-align: center; border: 1px solid var(--border-color); }
-    .stat-number { font-family: 'JetBrains Mono', monospace; font-size: 2.8rem; font-weight: 700; }
-    .dry .stat-number { color: var(--accent-green); }
-    .wet .stat-number { color: hsl(0, 72%, 45%); }
-
-    .viewport { width: 100%; max-width: 640px; aspect-ratio: 4/3; border-radius: 1.5rem; border: 2px solid var(--viewport-border); background: #000; overflow: hidden; position: relative; }
-    #videoFeed { width: 100%; height: 100%; object-fit: cover; }
-    #placeholder { font-family: 'Press Start 2P', system-ui; font-size: 0.6rem; color: #555; text-align: center; padding-top: 30%; line-height: 2.5; }
-
-    .btn { font-family: 'Press Start 2P', system-ui; font-size: 0.7rem; padding: 1.2rem 2.5rem; border-radius: 0.75rem; border: none; cursor: pointer; transition: transform 0.1s; }
-    .btn:active { transform: scale(0.95); }
-    .btn-primary { background: var(--accent-green); color: #000; font-weight: bold; }
-    .btn-danger { background: #fee2e2; color: #dc2626; border: 1px solid #fecaca; }
-    .btn-secondary { background: #6b7280; color: white; padding: 1.2rem 1.5rem; }
-    
-    .btn-export { background: transparent; color: var(--text-muted); border: 1px dashed var(--border-color); padding: 0.8rem 1.5rem; font-size: 0.5rem; margin-top: 0.5rem; }
-    .btn-export:hover { border-color: var(--accent-green); color: var(--accent-green); }
-
-    .total-bar { width: 100%; max-width: 640px; border-radius: 1rem; background: var(--card-bg); border: 1px solid var(--border-color); padding: 1.2rem; display: flex; flex-direction: column; align-items: center; gap: 1rem; }
-    .total-track { width: 100%; height: 14px; border-radius: 7px; background: rgba(0,0,0,0.05); overflow: hidden; display: flex; }
-    .total-dry { height: 100%; background: var(--accent-green); transition: width 0.8s; }
-    .total-wet { height: 100%; background: hsl(0, 72%, 45%); transition: width 0.8s; }
-
-    .guide { width: 100%; max-width: 640px; }
-    .guide-toggle { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 1.2rem; border-radius: 1rem; border: 1px solid var(--border-color); background: var(--card-bg); cursor: pointer; color: var(--text-main); }
-    .panel { max-height: 0; overflow: hidden; transition: 0.5s ease; opacity: 0; }
-    .panel.open { max-height: 1200px; opacity: 1; }
-    .panel-inner { margin-top: 12px; padding: 1.5rem; border-radius: 1rem; border: 1px solid var(--border-color); background: var(--card-bg); }
-    
-    #db-search {
-        width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px; 
-        border: 1px solid var(--border-color); background: var(--bg-color); 
-        color: var(--text-main); font-family: 'JetBrains Mono'; font-size: 0.7rem;
-    }
-
-    .tabs { display: flex; gap: 10px; margin-bottom: 20px; }
-    .tab { font-family: 'Press Start 2P', system-ui; font-size: 0.5rem; padding: 12px; border-radius: 6px; cursor: pointer; border: none; background: rgba(128,128,128,0.1); color: #888; }
-    .tab.active-dry { color: #000; background: var(--accent-green); }
-    .tab.active-wet { color: #fff; background: hsl(0, 72%, 45%); }
-    .tip-item { display: flex; gap: 15px; padding: 1rem; border-radius: 0.75rem; background: rgba(0,0,0,0.02); margin-bottom: 12px; align-items: center; border: 1px solid var(--border-color); }
-    .hidden { display: none !important; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>EcoFlow AI</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=JetBrains+Mono&display=swap" rel="stylesheet">
+    <style>
+        :root { --green: #7ceb7c; --bg: #0a0b10; --text: #f4f4f9; }
+        body { background: var(--bg); color: var(--text); font-family: sans-serif; margin: 0; text-align: center; }
+        .container { padding: 20px; max-width: 500px; margin: auto; }
+        h1 { font-family: 'Press Start 2P'; font-size: 1.2rem; color: var(--green); }
+        .viewport { width: 100%; aspect-ratio: 1/1; background: #000; border: 2px solid #333; border-radius: 15px; position: relative; overflow: hidden; margin: 20px 0; }
+        video { width: 100%; height: 100%; object-fit: cover; }
+        .hidden { display: none; }
+        .btn { background: var(--green); color: #000; border: none; padding: 15px 30px; font-family: 'Press Start 2P'; font-size: 0.7rem; border-radius: 10px; cursor: pointer; width: 100%; margin-bottom: 10px; }
+        #debug-console { background: #000; color: var(--green); font-family: 'JetBrains Mono'; font-size: 10px; padding: 10px; border: 1px solid #333; height: 60px; overflow-y: auto; text-align: left; }
+        .stats { display: flex; gap: 10px; margin-bottom: 20px; }
+        .stat-box { flex: 1; background: #161821; padding: 15px; border-radius: 10px; border: 1px solid #333; }
+        .num { font-size: 2rem; font-family: 'JetBrains Mono'; font-weight: bold; }
+    </style>
 </head>
-<body data-theme="light">
+<body>
 
-  <div id="intro-overlay">
-    <div class="intro-text">ECO<span>FLOW</span></div>
-  </div>
-
-  <div id="star-container"></div>
-  <button class="theme-toggle" onclick="toggleTheme()" id="theme-btn">🌙</button>
-
-  <div class="container" id="main-content">
-    <header>
-      <h1>ECO<span>FLOW</span></h1>
-      <div class="mission-box">
-        <strong class="mission-label">OUR MISSION:</strong>
-        <p class="mission-text">
-          EcoFlow is an autonomous intelligence layer designed to sanitize the global resource cycle, 
-          transforming chaotic waste into organized streams to eliminate pollution at the source 
-          and restore the structural health of our natural environment.
-        </p>
-      </div>
-    </header>
-
+<div class="container">
+    <h1>ECO<span>FLOW</span> AI</h1>
+    
     <div class="stats">
-      <div class="stat-card dry">
-        <p style="font-family: 'Press Start 2P'; font-size: 0.4rem; color: #888; margin-bottom: 10px;">DRY OBJECTS</p>
-        <p class="stat-number" id="dry-count">0</p>
-      </div>
-      <div class="stat-card wet">
-        <p style="font-family: 'Press Start 2P'; font-size: 0.4rem; color: #888; margin-bottom: 10px;">WET OBJECTS</p>
-        <p class="stat-number" id="wet-count">0</p>
-      </div>
-    </div>
-
-    <div style="display: flex; gap: 10px; width: 100%; max-width: 640px; justify-content: center;">
-        <button class="btn btn-primary" id="camera-btn" onclick="toggleCamera()" style="flex: 2;">INITIALIZE CAMERA</button>
-        <button class="btn btn-secondary" onclick="resetSystem()" style="flex: 1;">RESET</button>
+        <div class="stat-box">DRY: <div class="num" id="dry-count">0</div></div>
+        <div class="stat-box">WET: <div class="num" id="wet-count">0</div></div>
     </div>
 
     <div class="viewport">
-      <video id="videoFeed" class="hidden" autoplay playsinline muted></video>
-      <div id="placeholder">SYSTEM OFFLINE<br>> AWAITING FOR INPUT</div>
+        <div id="placeholder" style="padding-top: 40%;">[ SYSTEM STANDBY ]</div>
+        <video id="videoFeed" autoplay playsinline muted></video>
     </div>
 
-    <div class="total-bar">
-      <div class="total-track">
-        <div class="total-dry" id="total-dry" style="width:0%"></div>
-        <div class="total-wet" id="total-wet" style="width:0%"></div>
-      </div>
-      <div style="display:flex; justify-content: space-between; width:100%; align-items:center;">
-        <span style="font-family: 'JetBrains Mono'; font-size: 11px; color: #888;" id="total-label">0 OBJECTS LOGGED</span>
-        <button class="btn btn-export" onclick="exportData()">DOWNLOAD_REPORT.TXT</button>
-      </div>
-    </div>
+    <button id="camera-btn" class="btn" onclick="initSystem()">INITIALIZE SYSTEM</button>
+    <button class="btn" style="background:#444; color:#fff;" onclick="resetStats()">RESET DATA</button>
+    
+    <div id="debug-console">> Awaiting uplink...</div>
+</div>
 
-    <div class="guide">
-      <button class="guide-toggle" onclick="toggleGuide()">
-        <div style="display:flex; align-items:center; gap:15px;">
-          <span style="font-size: 20px;">🕹️</span>
-          <h3 style="font-family: 'Press Start 2P'; font-size: 0.6rem;">WASTE SORTING DATABASE</h3>
-        </div>
-      </button>
-      <div class="panel" id="guide-panel">
-        <div class="panel-inner">
-          <input type="text" id="db-search" placeholder="SEARCH DATABASE (e.g. Apple, Plastic)...">
-          <div class="tabs">
-            <button class="tab active-dry" id="tab-dry" onclick="switchTab('dry')">DRY MODE</button>
-            <button class="tab" id="tab-wet" onclick="switchTab('wet')">WET MODE</button>
-          </div>
-          <div id="tip-list"></div>
-        </div>
-      </div>
-    </div>
-  </div>
+<script>
+    let cameraActive = false;
 
- <script>
-    // --- GLOBAL STATE ---
-    let currentDry = 0, currentWet = 0, lastTotal = 0, cameraActive = false;
-
-    // --- 1. UTILITY FUNCTIONS ---
-
-    // Logging for the Debug Console
     function log(msg) {
-        const consoleEl = document.getElementById('debug-console');
-        if (consoleEl) {
-            const time = new Date().toLocaleTimeString().split(' ')[0];
-            consoleEl.innerHTML += `<div>[${time}] ${msg}</div>`;
-            consoleEl.scrollTop = consoleEl.scrollHeight;
-        }
+        document.getElementById('debug-console').innerHTML = "> " + msg;
     }
 
-    // Voice Synthesis
-    function mobileSpeak(text) {
-        if ('speechSynthesis' in window && text !== "") {
-            window.speechSynthesis.cancel(); 
-            const utterance = new SpeechSynthesisUtterance(text);
-            utterance.pitch = 1.0; 
-            utterance.rate = 1;
-            window.speechSynthesis.speak(utterance);
-        }
-    }
-
-    // UI Updates
-    function updateUI(stats) {
-        document.getElementById('dry-count').innerText = stats.dry;
-        document.getElementById('wet-count').innerText = stats.wet;
-        
-        const total = stats.dry + stats.wet;
-        const totalLabel = document.getElementById('total-label');
-        if(totalLabel) totalLabel.innerText = total + ' OBJECTS LOGGED';
-
-        if (stats.dry > currentDry || stats.wet > currentWet) {
-            if ('vibrate' in navigator) navigator.vibrate(100);
-            currentDry = stats.dry;
-            currentWet = stats.wet;
-        }
-    }
-
-    // --- 2. CORE CAMERA & AI LOGIC ---
-
-    async function toggleCamera() {
+    async function initSystem() {
         const video = document.getElementById('videoFeed');
         const btn = document.getElementById('camera-btn');
-        const badge = document.getElementById('ai-badge');
-        const placeholder = document.getElementById('placeholder');
 
         if (!cameraActive) {
-            log("Initializing AI Scanner...");
+            log("Requesting Camera...");
+            
+            // Standard constraints for mobile
             const constraints = {
-                video: { facingMode: "environment", width: { ideal: 640 }, height: { ideal: 480 } },
+                video: { facingMode: "environment", width: { ideal: 480 }, height: { ideal: 480 } },
                 audio: false
             };
 
@@ -251,159 +65,65 @@
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
                 video.srcObject = stream;
                 
-                video.onloadedmetadata = () => {
-                    video.play().then(() => {
-                        log("Stream Active: System Online.");
-                    });
-                };
+                // Critical for iOS/Safari
+                video.setAttribute("playsinline", true);
+                video.play();
 
-                video.classList.remove('hidden');
-                placeholder.classList.add('hidden');
-                document.getElementById('scanner').style.display = 'block';
-                badge.classList.remove('hidden');
-                
+                document.getElementById('placeholder').classList.add('hidden');
                 cameraActive = true;
-                btn.innerText = "TERMINATE LINK";
-                btn.className = "btn btn-danger";
+                btn.innerText = "SYSTEM ONLINE";
+                btn.style.background = "#444";
+                log("Uplink Established. Scanning...");
                 
-                // Start the AI processing loop
-                sendFramesToAI(); 
-
+                // Start AI Loop
+                startScanning();
             } catch (err) {
-                log("CAMERA ERROR: " + err.name);
-                alert("Please ensure you are using HTTPS and have allowed camera access.");
+                log("CRITICAL ERROR: " + err.name);
+                alert("CAMERA BLOCKED: Please use HTTPS and allow camera access in site settings.");
             }
-        } else {
-            location.reload(); 
         }
     }
 
-    // This function captures frames and sends them to your Flask app.py
-    async function sendFramesToAI() {
+    async function startScanning() {
         if (!cameraActive) return;
 
         const video = document.getElementById('videoFeed');
         const canvas = document.createElement('canvas');
-        canvas.width = 224; 
+        canvas.width = 224;
         canvas.height = 224;
         const ctx = canvas.getContext('2d');
-        
+
+        // Draw current frame to canvas
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.5); 
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.5);
 
         try {
             const response = await fetch('/process_frame', {
                 method: 'POST',
-                body: JSON.stringify({ image: dataUrl }),
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ image: dataUrl })
             });
-            
             const result = await response.json();
-            
-            if(result.status === "success") {
-                document.getElementById('ai-badge').innerText = `AI CORE: ${result.label} (${result.conf}%)`;
-                updateUI(result.stats);
+
+            if (result.status === "success") {
+                document.getElementById('dry-count').innerText = result.stats.dry;
+                document.getElementById('wet-count').innerText = result.stats.wet;
             }
-        } catch (err) {
-            console.error("AI Sync Error");
+        } catch (e) {
+            console.error("AI Sync failed");
         }
 
-        setTimeout(sendFramesToAI, 1000); // Scan every 1 second
-        sendFramesToAI();
+        setTimeout(startScanning, 1000);
     }
 
-    // --- 3. SYSTEM CONTROLS ---=
-
-    async function resetSystem() {
+    async function resetStats() {
         try {
             const res = await fetch('/reset_stats');
             const data = await res.json();
-            currentDry = 0; currentWet = 0; lastTotal = 0;
-            updateUI(data.stats);
-            mobileSpeak("System Reset Successful");
-        } catch (e) {
-            log("Reset failed.");
-        }
-    }
-
-    function exportData() {
-        try {
-            const timestamp = new Date().toLocaleString();
-            const total = currentDry + currentWet;
-            const content = `ECOFLOW REPORT\nGenerated: ${timestamp}\nDry: ${currentDry}\nWet: ${currentWet}\nTotal: ${total}`;
-            const blob = new Blob([content], { type: 'text/plain' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `EcoFlow_Report.txt`;
-            a.click();
-            mobileSpeak("Report downloaded.");
-        } catch (e) {
-            log("Export Error");
-        }
-    }
-
-    // --- 4. DATA & UI COMPONENTS ---
-
-    const tips = {
-        dry: [
-            { icon: "📦", name: "Cardboard", tip: "Keep dry and flattened." },
-            { icon: "🥤", name: "Plastic Bottles", tip: "Rinse and crush to save space." },
-            { icon: "📄", name: "Office Paper", tip: "Recyclable unless shredded." },
-            { icon: "🥫", name: "Metal Cans", tip: "Aluminum/Steel are 100% recyclable." }
-        ],
-        wet: [
-            { icon: "🍎", name: "Food Scraps", tip: "Organic matter for compost." },
-            { icon: "☕", name: "Coffee Grounds", tip: "Nitrogen-rich; great for soil." },
-            { icon: "🥚", name: "Eggshells", tip: "Crush to speed up composting." },
-            { icon: "🍌", name: "Fruit Peels", tip: "Excellent green waste." }
-        ]
-    };
-
-    function renderTips(type, filter = "") {
-        const list = document.getElementById("tip-list");
-        if(!list) return;
-        const source = filter ? [...tips.dry, ...tips.wet] : tips[type];
-        list.innerHTML = source
-            .filter(t => t.name.toLowerCase().includes(filter.toLowerCase()))
-            .map(t => `<div class="tip-item"><span style="font-size:24px;">${t.icon}</span><div><p style="font-weight:bold; font-size:0.9rem;">${t.name}</p><p style="font-size:0.8rem; color:gray;">${t.tip}</p></div></div>`)
-            .join("");
-    }
-
-    // --- 5. INITIALIZATION ---
-
-    window.addEventListener('load', () => {
-        // Star Background
-        const stars = document.getElementById('star-container');
-        if(stars) {
-            for (let i = 0; i < 50; i++) {
-                const s = document.createElement('div');
-                s.className = 'star';
-                s.style.left = Math.random() * 100 + 'vw';
-                s.style.top = Math.random() * 100 + 'vh';
-                stars.appendChild(s);
-            }
-        }
-        
-        // UI Tabs
-        const searchInput = document.getElementById('db-search');
-        if(searchInput) {
-            searchInput.addEventListener('input', (e) => { renderTips("", e.target.value); });
-        }
-
-        // Overlay transition
-        setTimeout(() => {
-            document.getElementById('intro-overlay').classList.add('fade-out');
-            document.getElementById('main-content').classList.add('visible');
-        }, 2000);
-    });
-
-    // Helper functions for UI interaction
-    function toggleGuide() { document.getElementById("guide-panel").classList.toggle("open"); renderTips("dry"); }
-    function switchTab(tab) { renderTips(tab); }
-    function toggleTheme() {
-        const isDark = document.body.getAttribute('data-theme') === 'dark';
-        document.body.setAttribute('data-theme', isDark ? 'light' : 'dark');
+            document.getElementById('dry-count').innerText = "0";
+            document.getElementById('wet-count').innerText = "0";
+            log("Stats Reset to Zero");
+        } catch(e) { log("Reset Connection Error"); }
     }
 </script>
 </body>
